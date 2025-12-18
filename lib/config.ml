@@ -16,12 +16,13 @@ let compare c1 c2 =
   let ver_cmp = Int.compare c1.version c2.version in
   if ver_cmp <> 0 then ver_cmp else ECL.compare c1.ecl c2.ecl
 
-let char_count_indicator_length t =
-  match t.version with
-  | v when v >= 1 && v <= 9 -> 9
-  | v when v >= 10 && v <= 26 -> 11
-  | v when v >= 27 && v <= 40 -> 13
-  | _ -> failwith "Invalid version number"
+  let char_count_indicator_length t =
+    match t.version with
+    | v when v >= 1 && v <= 9 -> 9
+    | v when v >= 10 && v <= 26 -> 11
+    | v when v >= 27 && v <= 40 -> 13
+    | _ -> raise (Invalid_argument "Invalid version number")
+end
 
 module ConfigMap = Map.Make (struct
   type nonrec t = t
@@ -241,36 +242,30 @@ let capacity_table : int ConfigMap.t =
   in
   List.fold_left add_entry ConfigMap.empty entries
 
-let get_capacity config = ConfigMap.find config capacity_table
+let get_alphanumeric_capacity config =
+  ConfigMap.find config alphanumeric_capacity
 
-(* let mode_indicator = 0b0010
-let mode_length = 4
-let mask_number = 0b000
-let mask_length = 3
+let mode_indicator_length = 4
+let mode_indicator = 0b0010
 
-let encode_format_string ~ecl =
-  let ecl_bits =
-    match ecl with
-    | ECL.L -> 0b01
-    | ECL.M -> 0b00
-    | ECL.Q -> 0b11
-    | ECL.H -> 0b10
+let get_config s ecl =
+  let length = String.length s in
+  let rec find_version v =
+    if v > 40 then
+      raise (Invalid_argument "Data too long to encode in QR code")
+    else
+      let config = Config.make ~version:v ~ecl in
+      let capacity = get_alphanumeric_capacity config in
+      if length <= capacity then config else find_version (v + 1)
   in
-  (* 5-bit format data: ECL(2 bits) + mask(3 bits) *)
-  let data = (ecl_bits lsl 3) lor mask_number in
-  (* Shift left 10 to make room for ECC bits *)
-  let shifted = data lsl 10 in
-  (* Generator polynomial: x^10 + x^8 + x^5 + x^4 + x^2 + x + 1 = 0x537 *)
-  let generator = 0x537 in
-  let remainder = ref shifted in
-  (* Binary polynomial division: XOR-based *)
-  for i = 4 downto 0 do
-    if !remainder land (1 lsl (14 + i)) <> 0 then
-      remainder := !remainder lxor (generator lsl i)
-  done;
-  (* Extract 10-bit ECC and combine with data *)
-  let ecc = !remainder land 0x3FF in
-  let format_bits = (data lsl 10) lor ecc in
-  (* XOR with mask pattern (all versions use 0b101010000010010) *)
-  let format_mask = 0b101010000010010 in
-  format_bits lxor format_mask *)
+  find_version 1
+
+(* open Buf
+
+let pack_preamble buf config =
+  (* Mode indicator *)
+  Buf.add_bits buf mode_indicator mode_indicator_length;
+  (* Character count indicator *)
+  let cci_len = Config.char_count_indicator_length config in
+  Buf.add_bits buf (get_alphanumeric_capacity config) cci_len;
+  buf *)
