@@ -150,8 +150,8 @@ let is_in_alignment_pattern t x y version =
 
 let is_reserved t x y version =
   let in_top_left = x <= 8 && y <= 8 in
-  let in_top_right = x >= t.width - 9 && y <= 8 in
-  let in_bottom_left = x <= 8 && y >= t.width - 9 in
+  let in_top_right = x >= t.width - 8 && y <= 8 in
+  let in_bottom_left = x <= 8 && y >= t.width - 8 in
   let in_finder_or_sep = in_top_left || in_top_right || in_bottom_left in
   let on_timing_row = y = 6 && x >= 8 && x <= t.width - 9 in
   let on_timing_col = x = 6 && y >= 8 && y <= t.width - 9 in

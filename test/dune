@@ -1,5 +1,8 @@
-(test
- (name test_oxqr)
+(library
+ (name test_qr)
  (libraries oxqr)
+ (inline_tests)
+ (preprocess
+  (pps ppx_expect))
  (flags
   (:standard -w -32)))
