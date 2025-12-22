@@ -4,12 +4,12 @@ type t = {
 }
 
 let create len_bytes = { buf = Bytes.make len_bytes '\000'; bit_pos = 0 }
-let capacity_bits t = Bytes.length t.buf * 8
-let bits_written t = t.bit_pos
-let remaining_bits t = capacity_bits t - t.bit_pos
-let pos t = t.bit_pos
-let pos_byte t = t.bit_pos lsr 3
-let pos_bit_in_byte t = t.bit_pos land 7
+let[@zero_alloc] capacity_bits t = Bytes.length t.buf * 8
+let[@zero_alloc] bits_written t = t.bit_pos
+let[@zero_alloc] remaining_bits t = capacity_bits t - t.bit_pos
+let[@zero_alloc] pos t = t.bit_pos
+let[@zero_alloc] pos_byte t = t.bit_pos lsr 3
+let[@zero_alloc] pos_bit_in_byte t = t.bit_pos land 7
 
 let reset t =
   Bytes.fill t.buf 0 (Bytes.length t.buf) '\000';
@@ -18,7 +18,7 @@ let reset t =
 let[@inline] check_space t needed_bits =
   if needed_bits > remaining_bits t then invalid_arg "Bitbuf: overflow"
 
-let write_bit t b =
+let[@zero_alloc] write_bit t b =
   check_space t 1;
   let byte_i = pos_byte t in
   let bit_off = pos_bit_in_byte t in
@@ -29,12 +29,12 @@ let write_bit t b =
   Bytes.unsafe_set t.buf byte_i (char_of_int v);
   t.bit_pos <- t.bit_pos + 1
 
-let write_bits_msb t ~value ~width =
+let[@zero_alloc] write_bits_msb t ~value ~width =
   if width < 0 || width > 31 then invalid_arg "Bitbuf.write_bits_msb: width";
   if width > 0 && value lsr width <> 0 then
     invalid_arg "Bitbuf.write_bits_msb: value doesn't fit width";
   check_space t width;
-  let remaining = ref width in
+  let remaining = stack_ (ref width) in
   while !remaining > 0 do
     let byte_i = pos_byte t in
     let bit_off = pos_bit_in_byte t in
@@ -50,7 +50,7 @@ let write_bits_msb t ~value ~width =
     remaining := !remaining - k
   done
 
-let write_byte t b =
+let[@zero_alloc] write_byte t b =
   if b land lnot 0xFF <> 0 then invalid_arg "Bitbuf.write_byte: out of range";
   write_bits_msb t ~value:b ~width:8
 

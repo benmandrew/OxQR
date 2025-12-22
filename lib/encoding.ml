@@ -1,19 +1,18 @@
-let encode_alphanumeric_data buf s =
-  let rec encode_pairs i =
-    if i >= String.length s then ()
-    else if i = String.length s - 1 then
-      (* Single character remaining: encode as 6 bits *)
-      let value = Config.alphanumeric_encode s.[i] in
-      Bitbuf.write_bits_msb buf ~value ~width:6
-    else
-      (* Encode pair of characters as 11 bits *)
-      let v1 = Config.alphanumeric_encode s.[i] in
-      let v2 = Config.alphanumeric_encode s.[i + 1] in
-      let value = (v1 * 45) + v2 in
-      Bitbuf.write_bits_msb buf ~value ~width:11;
-      encode_pairs (i + 2)
-  in
-  encode_pairs 0
+let rec encode_pairs buf s i =
+  if i >= String.length s then ()
+  else if i = String.length s - 1 then
+    (* Single character remaining: encode as 6 bits *)
+    let value = Config.alphanumeric_encode s.[i] in
+    Bitbuf.write_bits_msb buf ~value ~width:6
+  else
+    (* Encode pair of characters as 11 bits *)
+    let v1 = Config.alphanumeric_encode s.[i] in
+    let v2 = Config.alphanumeric_encode s.[i + 1] in
+    let value = (v1 * 45) + v2 in
+    Bitbuf.write_bits_msb buf ~value ~width:11;
+    encode_pairs buf s (i + 2)
+
+let encode_alphanumeric_data buf s = encode_pairs buf s 0
 
 let add_terminator_and_padding buf total_data_codewords =
   (* Add terminator (0000, up to 4 bits) *)
@@ -118,8 +117,8 @@ let format_output config data blocks final_data =
     |> Seq.map (fun c -> Printf.sprintf "%02X" (Char.code c))
     |> List.of_seq |> String.concat " ")
 
-let encode s ecl =
-  let config, _ = Config.get_config_and_capacity s ecl in
+let encode s (ecl @ local) =
+  let config = Config.get_config s ecl in
   let ec_info = Config.get_ec_info config in
   let total_data_codewords =
     (ec_info.group1_blocks * ec_info.group1_data_codewords)
@@ -135,7 +134,7 @@ let encode s ecl =
   buf
 
 let generate_qr s ecl =
-  let config, _ = Config.get_config_and_capacity s ecl in
+  let config = Config.get_config s ecl in
   let ec_info = Config.get_ec_info config in
   let data = Bitbuf.to_bytes @@ encode s ecl in
   let blocks = split_into_blocks data ec_info in
@@ -151,7 +150,7 @@ let generate_qr s ecl =
   qr
 
 let generate_debug s ecl =
-  let config, _capacity = Config.get_config_and_capacity s ecl in
+  let config = Config.get_config s ecl in
   let ec_info = Config.get_ec_info config in
   let total_data_codewords =
     (ec_info.group1_blocks * ec_info.group1_data_codewords)

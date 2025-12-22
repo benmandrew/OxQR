@@ -22,5 +22,5 @@ type ec_info = {
 
 val mode_indicator_length : int
 val mode_indicator : int
-val get_config_and_capacity : string -> ECL.t -> t * int
+val get_config : string -> ECL.t -> t
 val get_ec_info : t -> ec_info
