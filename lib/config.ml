@@ -23,6 +23,24 @@ let char_count_indicator_length t =
   | v when v >= 27 && v <= 40 -> 13
   | _ -> raise (Invalid_argument "Invalid version number")
 
+let alphanumeric_encode c =
+  match c with
+  | '0' .. '9' -> Char.code c - Char.code '0'
+  | 'A' .. 'Z' -> Char.code c - Char.code 'A' + 10
+  | ' ' -> 36
+  | '$' -> 37
+  | '%' -> 38
+  | '*' -> 39
+  | '+' -> 40
+  | '-' -> 41
+  | '.' -> 42
+  | '/' -> 43
+  | ':' -> 44
+  | _ ->
+      raise
+        (Invalid_argument
+           (Printf.sprintf "Invalid alphanumeric character: %c" c))
+
 module ConfigMap = Map.Make (struct
   type nonrec t = t
 

@@ -10,6 +10,7 @@ type t = { version : int; ecl : ECL.t }
 val make : version:int -> ecl:ECL.t -> t
 val compare : t -> t -> int
 val char_count_indicator_length : t -> int
+val alphanumeric_encode : char -> int
 
 type ec_info = {
   ec_codewords_per_block : int;
