@@ -1,10 +1,12 @@
 open Oxqr
 
 let run data ecl =
-  let qr = Encoding.generate_qr data ecl in
-  let qr_string = Qr.to_unicode_string qr in
-  print_string qr_string;
-  Ok ()
+  match Encoding.generate_qr data ecl with
+  | Ok qr ->
+      let qr_string = Qr.to_unicode_string qr in
+      print_string qr_string;
+      Ok ()
+  | Error msg -> Error (`Msg msg)
 
 let data_arg =
   let doc = "Alphanumeric data to encode as a QR code." in

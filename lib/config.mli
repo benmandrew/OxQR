@@ -11,6 +11,7 @@ val make : version:int -> ecl:ECL.t -> t
 val compare : t -> t -> int
 val char_count_indicator_length : t -> int
 val alphanumeric_encode : char -> int
+val alphanumeric_encode_res : char -> local_ (int, string) result
 
 type ec_info = {
   ec_codewords_per_block : int;
