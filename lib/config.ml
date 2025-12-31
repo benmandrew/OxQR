@@ -1,24 +1,22 @@
 open Base
 
 module ECL = struct
-  type t = L | M | Q | H [@@deriving sexp_of, compare]
+  type t = L | M | Q | H [@@deriving sexp_of, compare, hash]
 end
 
 module T = struct
-  type t = { version : int; ecl : ECL.t } [@@deriving sexp_of, compare]
+  type t = { version : int; ecl : ECL.t } [@@deriving sexp_of, compare, hash]
 end
 
 include T
-include Comparator.Make (T)
 
-module Key = struct
-  include T
-  include Comparator.Make (T)
-end
+let make_local ~version ~(ecl @ local) =
+  assert (version >= 1 && version <= 40);
+  exclave_ { version; ecl }
 
 let make ~version ~(ecl @ local) =
   assert (version >= 1 && version <= 40);
-  exclave_ { version; ecl }
+  { version; ecl }
 
 let[@zero_alloc] char_count_indicator_length t =
   match t.version with
@@ -67,8 +65,9 @@ type ec_info = {
 
 (* Alphanumeric mode *)
 let capacity_table =
-  let add_entry map (version, ecl, capacity) =
-    Map.set map ~key:{ version; ecl } ~data:capacity
+  let hash_table = Hashtbl.create (module T) in
+  let add_entry (version, ecl, capacity) =
+    Hashtbl.set hash_table ~key:{ version; ecl } ~data:capacity
   in
   let open ECL in
   let entries =
@@ -275,12 +274,14 @@ let capacity_table =
       (40, H, 1852);
     ]
   in
-  List.fold_left entries ~init:(Map.empty (module Key)) ~f:add_entry
+  List.iter entries ~f:add_entry;
+  hash_table
 
 let ec_table =
-  let add_entry map
+  let hash_table = Hashtbl.create (module T) in
+  let add_entry
       (version, ecl, ec_per_block, g1_blocks, g1_data, g2_blocks, g2_data) =
-    Map.set map ~key:{ version; ecl }
+    Hashtbl.set hash_table ~key:{ version; ecl }
       ~data:
         {
           ec_codewords_per_block = ec_per_block;
@@ -495,10 +496,11 @@ let ec_table =
       (40, H, 30, 20, 15, 61, 16);
     ]
   in
-  List.fold_left entries ~init:(Map.empty (module Key)) ~f:add_entry
+  List.iter entries ~f:add_entry;
+  hash_table
 
-let get_capacity config = Map.find_exn capacity_table config
-let get_ec_info config = Map.find_exn ec_table config
+let get_capacity config = Hashtbl.find_exn capacity_table config
+let get_ec_info config = Hashtbl.find_exn ec_table config
 let mode_indicator_length = 4
 let mode_indicator = 0b0010
 

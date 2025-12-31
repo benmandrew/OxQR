@@ -1,30 +1,29 @@
 open Base
-open Base.Result.Let_syntax
 
 let[@zero_alloc] rec encode_pairs buf s len i =
-  let decode c =
+  let[@zero_alloc] decode c =
     match c with
-    | '0' .. '9' -> Ok (Char.to_int c - Char.to_int '0')
-    | 'A' .. 'Z' -> Ok (Char.to_int c - Char.to_int 'A' + 10)
-    | ' ' -> Ok 36
-    | '$' -> Ok 37
-    | '%' -> Ok 38
-    | '*' -> Ok 39
-    | '+' -> Ok 40
-    | '-' -> Ok 41
-    | '.' -> Ok 42
-    | '/' -> Ok 43
-    | ':' -> Ok 44
-    | _ -> Error "Invalid alphanumeric character"
+    | '0' .. '9' -> Char.to_int c - Char.to_int '0'
+    | 'A' .. 'Z' -> Char.to_int c - Char.to_int 'A' + 10
+    | ' ' -> 36
+    | '$' -> 37
+    | '%' -> 38
+    | '*' -> 39
+    | '+' -> 40
+    | '-' -> 41
+    | '.' -> 42
+    | '/' -> 43
+    | ':' -> 44
+    | _ -> failwith "Invalid alphanumeric character"
   in
-  if i >= len then Ok ()
+  if i >= len then ()
   else if i = len - 1 then
-    decode s.[i] >>= fun value -> Bitbuf.write_bits_msb buf ~value ~width:6
+    let value = decode s.[i] in
+    Bitbuf.write_bits_msb buf ~value ~width:6
   else
-    decode s.[i] >>= fun v1 ->
-    decode s.[i + 1] >>= fun v2 ->
+    let v1 = decode s.[i] and v2 = decode s.[i + 1] in
     let value = (v1 * 45) + v2 in
-    Bitbuf.write_bits_msb buf ~value ~width:11 >>= fun () ->
+    Bitbuf.write_bits_msb buf ~value ~width:11;
     encode_pairs buf s len (i + 2)
 
 let[@zero_alloc] encode_alphanumeric_data buf s =
@@ -36,25 +35,23 @@ let add_terminator_and_padding (buf @ local) total_data_codewords =
   let bits_used = Bitbuf.bits_written buf in
   let max_bits = total_data_codewords * 8 in
   let terminator_bits = min 4 (max_bits - bits_used) in
-  (if terminator_bits > 0 then
-     Bitbuf.write_bits_msb buf ~value:0 ~width:terminator_bits
-   else Ok ())
-  >>= fun () ->
+  if terminator_bits > 0 then
+    Bitbuf.write_bits_msb buf ~value:0 ~width:terminator_bits;
   (* Pad to byte boundary *)
   let bits_after_term = Bitbuf.bits_written buf in
   let pad_to_byte = (8 - (bits_after_term % 8)) % 8 in
-  (if pad_to_byte > 0 then Bitbuf.write_bits_msb buf ~value:0 ~width:pad_to_byte
-   else Ok ())
-  >>= fun () ->
+  if pad_to_byte > 0 then Bitbuf.write_bits_msb buf ~value:0 ~width:pad_to_byte;
   (* Add padding bytes (alternating 0xEC and 0x11) *)
   let bytes_used = Bitbuf.bits_written buf / 8 in
   let rec add_padding i =
-    if i >= total_data_codewords then Ok ()
+    if i >= total_data_codewords then ()
     else
       let pad_byte = if (i - bytes_used) % 2 = 0 then 0xEC else 0x11 in
-      Bitbuf.write_byte buf pad_byte >>= fun () -> add_padding (i + 1)
+      Bitbuf.write_byte buf pad_byte;
+      add_padding (i + 1)
   in
-  add_padding bytes_used
+  add_padding bytes_used;
+  ()
 
 let split_into_blocks data ec_info =
   let g1_count = ec_info.Config.group1_blocks in
@@ -119,29 +116,26 @@ let encode s (ecl @ local) =
     + (ec_info.group2_blocks * ec_info.group2_data_codewords)
   in
   exclave_
-  let buf = Bitbuf.create total_data_codewords in
+  let buf = Bitbuf.create () in
   Bitbuf.write_bits_msb buf ~value:Config.mode_indicator
-    ~width:Config.mode_indicator_length
-  >>= fun () ->
+    ~width:Config.mode_indicator_length;
   let cci_len = Config.char_count_indicator_length config in
-  Bitbuf.write_bits_msb buf ~value:(String.length s) ~width:cci_len
-  >>= fun () ->
-  encode_alphanumeric_data buf s >>| fun () ->
-  add_terminator_and_padding buf total_data_codewords >>= fun () -> buf
+  Bitbuf.write_bits_msb buf ~value:(String.length s) ~width:cci_len;
+  encode_alphanumeric_data buf s;
+  add_terminator_and_padding buf total_data_codewords;
+  buf
 
 let generate_qr s ecl =
   let config = Config.get_config s ecl in
   let ec_info = Config.get_ec_info config in
-  match encode s ecl with
-  | Error _ as e -> exclave_ e
-  | Ok buf ->
-      let data = Bitbuf.to_bytes buf in
-      let blocks = split_into_blocks data ec_info in
-      let final_data = interleave_blocks blocks ec_info in
-      let qr = Qr.make ~version:config.version in
-      Qr.place_pattern_modules qr config.version;
-      let mask_pattern = 0 in
-      Qr.place_format_info qr ~ecl:config.ecl ~mask_pattern;
-      Qr.place_data qr final_data config.version;
-      Qr.apply_mask_pattern qr;
-      Ok qr
+  let buf = encode s ecl in
+  let data = Bitbuf.to_bytes buf in
+  let blocks = split_into_blocks data ec_info in
+  let final_data = interleave_blocks blocks ec_info in
+  let qr = Qr.make ~version:config.version in
+  Qr.place_pattern_modules qr config.version;
+  let mask_pattern = 0 in
+  Qr.place_format_info qr ~ecl:config.ecl ~mask_pattern;
+  Qr.place_data qr final_data config.version;
+  Qr.apply_mask_pattern qr;
+  qr

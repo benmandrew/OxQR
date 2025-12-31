@@ -2,6 +2,6 @@
  (name oxqr)
  (libraries base)
  (preprocess
-  (pps ppx_sexp_conv ppx_compare))
+  (pps ppx_sexp_conv ppx_compare ppx_hash))
  (flags
   (:standard -w -32)))
