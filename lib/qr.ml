@@ -51,11 +51,11 @@ let place_timing_patterns t =
 let alignment_coords =
   [|
     [];
-    [];
     [ 6; 18 ];
     [ 6; 22 ];
     [ 6; 26 ];
-    [ 6; 30; 34 ];
+    [ 6; 30 ];
+    [ 6; 34 ];
     [ 6; 22; 38 ];
     [ 6; 24; 42 ];
     [ 6; 26; 46 ];
@@ -94,8 +94,8 @@ let alignment_coords =
 
 let place_alignment_patterns t version =
   if version < 2 then ()
-  else if version >= 0 && version < Array.length alignment_coords then
-    let coords = Array.get alignment_coords version in
+  else
+    let coords = Array.get alignment_coords (version - 1) in
     (* Create Cartesian product of coordinates *)
     List.iter coords ~f:(fun cx ->
         List.iter coords ~f:(fun cy ->
@@ -123,8 +123,7 @@ let place_dark_module t version =
   set_module t 8 y '\001'
 
 let alignment_coords_for_version version =
-  if version >= 0 && version < Array.length alignment_coords then
-    Array.get alignment_coords version
+  if version >= 1 && version <= 40 then Array.get alignment_coords (version - 1)
   else []
 
 let is_in_alignment_pattern t x y version =

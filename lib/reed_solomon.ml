@@ -50,19 +50,24 @@ let generator_polynomials =
 (** Generate the generator polynomial for n error correction codewords *)
 let[@zero_alloc] generate_generator_polynomial n = generator_polynomials.(n)
 
-let remainder_scratch = Array.create ~len:50 0
+(* Scratch space sized for the worst QR block (version 40, max data 119, max
+   ec 30) with headroom. *)
+let remainder_scratch = Array.create ~len:512 0
 
-(** Generate error correction codewords for given data and number of ec
-    codewords *)
-let[@zero_alloc] generate_error_correction (data @ local) ec_count out_buf =
-  let data_len = Bytes.length data in
+(** Generate error correction codewords for given data slice and number of ec
+    codewords, writing into [out] at [out_pos]. *)
+let[@zero_alloc] generate_error_correction (data @ local) ~pos ~len ec_count
+    (out @ local) ~out_pos =
   let generator = generate_generator_polynomial ec_count in
-  (* Copy data into the beginning of remainder *)
-  for i = 0 to data_len - 1 do
-    remainder_scratch.(i) <- Char.to_int (Bytes.get data i)
+  (* Copy data slice into the beginning of remainder and clear the EC tail. *)
+  for i = 0 to len - 1 do
+    remainder_scratch.(i) <- Char.to_int (Bytes.get data (pos + i))
+  done;
+  for i = 0 to ec_count - 1 do
+    remainder_scratch.(len + i) <- 0
   done;
   (* Polynomial division *)
-  for i = 0 to data_len - 1 do
+  for i = 0 to len - 1 do
     let coef = remainder_scratch.(i) in
     if coef <> 0 then
       for j = 0 to ec_count do
@@ -73,5 +78,5 @@ let[@zero_alloc] generate_error_correction (data @ local) ec_count out_buf =
   done;
   (* Extract the last ec_count bytes as the error correction codewords *)
   for i = 0 to ec_count - 1 do
-    Bytes.set out_buf i (Char.of_int_exn remainder_scratch.(data_len + i))
+    Bytes.set out (out_pos + i) (Char.of_int_exn remainder_scratch.(len + i))
   done
