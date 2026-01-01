@@ -16,7 +16,7 @@ let generate_qr_svg data_js ecl_str_js =
     | _ -> Config.ECL.M (* Default to M if invalid *)
   in
   let qr = Encoding.generate_qr data ecl in
-  let result = Xml.qr_to_xml qr in
+  let result = Svg.qr_to_svg qr in
   Js.string result
 
 (* Export both functions for use in js_of_ocaml *)

@@ -1,6 +1,6 @@
 open Base
 
-let qr_to_xml (t : Qr.t) =
+let qr_to_svg (t : Qr.t) =
   let buf = Buffer.create 13000 in
   let width = t.width + 8 in
   Buffer.add_string buf
