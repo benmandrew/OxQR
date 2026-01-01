@@ -53,13 +53,13 @@ function displayQR(svgString) {
     output.classList.add('visible');
 }
 
-document.getElementById('qrForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
+// Generate QR code from current form values
+async function generateQRFromInputs() {
     hideError();
     const data = document.getElementById('data').value.trim();
     const ecl = document.getElementById('ecl').value;
     if (!data) {
-        showError('Please enter some data to encode');
+        document.getElementById('output').classList.remove('visible');
         return;
     }
     showLoading(true);
@@ -80,6 +80,21 @@ document.getElementById('qrForm').addEventListener('submit', async (e) => {
     } finally {
         showLoading(false);
     }
+}
+
+document.getElementById('qrForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await generateQRFromInputs();
+});
+
+// Auto-generate on input change
+document.getElementById('data').addEventListener('input', () => {
+    generateQRFromInputs();
+});
+
+// Auto-generate on ECL change
+document.getElementById('ecl').addEventListener('change', () => {
+    generateQRFromInputs();
 });
 
 document.getElementById('qrForm').addEventListener('reset', () => {
@@ -87,7 +102,13 @@ document.getElementById('qrForm').addEventListener('reset', () => {
     hideError();
 });
 
-// Initialize module on page load
-window.addEventListener('load', () => {
-    initWasm().catch(err => console.warn('Module init delayed:', err));
+// Initialize module on page load and generate initial QR
+window.addEventListener('load', async () => {
+    try {
+        await initWasm();
+        // Generate QR with default value
+        await generateQRFromInputs();
+    } catch (err) {
+        console.warn('Module init delayed:', err);
+    }
 });
