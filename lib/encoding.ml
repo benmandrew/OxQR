@@ -15,6 +15,7 @@ module Arena = struct
     block_ec_pos : int array;
     block_ec_len : int array;
     ec_storage : Bytes.t;
+    remainder_scratch : int array;
     interleave_buffer : Bytes.t;
     bitbuf_storage : Bytes.t;
   }
@@ -25,12 +26,14 @@ module Arena = struct
       block_data_len = Array.create ~len:max_blocks 0;
       block_ec_pos = Array.create ~len:max_blocks 0;
       block_ec_len = Array.create ~len:max_blocks 0;
-      ec_storage = Bytes.create max_total_ec_bytes;
-      interleave_buffer = Bytes.create max_total_bytes;
-      bitbuf_storage = Bytes.create max_total_bytes;
+      ec_storage = Bytes.make max_total_ec_bytes '\000';
+      remainder_scratch = Array.create ~len:512 0;
+      interleave_buffer = Bytes.make max_total_bytes '\000';
+      bitbuf_storage = Bytes.make max_total_bytes '\000';
     }
 
   let get_qr_buffer (arena @ local) = arena.bitbuf_storage
+  let get_remainder_scratch (arena @ local) = arena.remainder_scratch
 end
 
 let[@zero_alloc] rec encode_pairs (buf @ local) s len i =
@@ -100,8 +103,9 @@ let[@zero_alloc] split_into_blocks arena ec_info =
     arena.block_data_len.(idx) <- g1_size;
     arena.block_ec_pos.(idx) <- ec_pos;
     arena.block_ec_len.(idx) <- ec_per_block;
-    Reed_solomon.generate_error_correction arena.bitbuf_storage ~pos:data_pos
-      ~len:g1_size ec_per_block arena.ec_storage ~out_pos:ec_pos
+    Reed_solomon.generate_error_correction arena.remainder_scratch
+      arena.bitbuf_storage ~pos:data_pos ~len:g1_size ec_per_block
+      arena.ec_storage ~out_pos:ec_pos
   done;
   (* Group 2 blocks *)
   let base_data_pos = g1_count * g1_size in
@@ -113,8 +117,9 @@ let[@zero_alloc] split_into_blocks arena ec_info =
     arena.block_data_len.(idx) <- g2_size;
     arena.block_ec_pos.(idx) <- ec_pos;
     arena.block_ec_len.(idx) <- ec_per_block;
-    Reed_solomon.generate_error_correction arena.bitbuf_storage ~pos:data_pos
-      ~len:g2_size ec_per_block arena.ec_storage ~out_pos:ec_pos
+    Reed_solomon.generate_error_correction arena.remainder_scratch
+      arena.bitbuf_storage ~pos:data_pos ~len:g2_size ec_per_block
+      arena.ec_storage ~out_pos:ec_pos
   done;
   total_blocks
 
@@ -180,13 +185,13 @@ let encode arena s (ecl @ local) =
 let generate_qr arena s ecl =
   let config = Config.get_config s ecl in
   let ec_info = Config.get_ec_info config in
-  let total_data_codewords = encode arena s ecl in
+  let _ = encode arena s ecl in
   let block_count = split_into_blocks arena ec_info in
   let final_data = interleave_blocks arena block_count ec_info in
   let qr = Qr.make ~version:config.version in
   Qr.place_pattern_modules qr config.version;
   let mask_pattern = 0 in
   Qr.place_format_info qr ~ecl:config.ecl ~mask_pattern;
-  Qr.place_data qr final_data total_data_codewords config.version;
+  Qr.place_data qr final_data config.version;
   Qr.apply_mask_pattern qr;
   qr

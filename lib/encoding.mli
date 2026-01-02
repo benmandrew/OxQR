@@ -3,6 +3,7 @@ module Arena : sig
 
   val create : unit -> t
   val get_qr_buffer : local_ t -> local_ Bytes.t
+  val get_remainder_scratch : local_ t -> local_ int array
 end
 
 val encode : Arena.t -> string -> Config.ECL.t -> int

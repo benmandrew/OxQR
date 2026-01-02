@@ -20,10 +20,10 @@ val place_format_info : local_ t -> ecl:Config.ECL.t -> mask_pattern:int -> unit
 (** [place_format_info t ~ecl ~mask_pattern] writes the 15 format bits (with BCH
     error correction and fixed XOR mask) into their two locations. *)
 
-val place_data : local_ t -> bytes -> int -> int -> unit
+val place_data : local_ t -> bytes -> int -> unit
 [@@zero_alloc]
-(** [place_data t data data_len version] places the encoded data bytes into the
-    QR code matrix [t], avoiding reserved areas for the given [version]. *)
+(** [place_data t data version] places the encoded data bytes into the QR code
+    matrix [t], avoiding reserved areas for the given [version]. *)
 
 val apply_mask_pattern : local_ t -> unit
 [@@zero_alloc]

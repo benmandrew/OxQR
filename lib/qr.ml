@@ -181,9 +181,9 @@ let[@zero_alloc] is_reserved (t @ local) x y version =
   || is_in_alignment_pattern t x y version
   || on_format_info
 
-let[@zero_alloc] place_data (t @ local) data data_len version =
+let[@zero_alloc] place_data (t @ local) data version =
   let bit_pos = ref 0 in
-  let data_bits = data_len * 8 in
+  let data_bits = Bytes.length data * 8 in
   (* Scan right-to-left in 2-column strips, alternating vertical direction per spec *)
   let x = ref (t.width - 1) in
   let upward = ref true in
@@ -242,7 +242,7 @@ let[@zero_alloc] ecl_format_bits (ecl @ local) =
 let[@zero_alloc] compute_format_bits (ecl @ local) mask_pattern =
   (* Build 15-bit format string: 5 bits data (ECL||mask) + 10-bit BCH *)
   let data = (ecl_format_bits ecl lsl 3) lor mask_pattern in
-  let v = ref (data lsl 10) in
+  let v = stack_ (ref (data lsl 10)) in
   let generator = 0b10100110111 in
   for i = 14 downto 10 do
     if (!v lsr i) land 1 = 1 then v := !v lxor (generator lsl (i - 10))
