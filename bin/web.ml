@@ -6,7 +6,7 @@ open Js_of_ocaml
 let generate_qr_svg data_js ecl_str_js =
   let data = Js.to_string data_js in
   let ecl_str = Js.to_string ecl_str_js in
-
+  let arena = Encoding.Arena.create () in
   let ecl =
     match String.uppercase ecl_str with
     | "L" -> Config.ECL.L
@@ -15,7 +15,7 @@ let generate_qr_svg data_js ecl_str_js =
     | "H" -> Config.ECL.H
     | _ -> Config.ECL.M (* Default to M if invalid *)
   in
-  let qr = Encoding.generate_qr data ecl in
+  let qr = Encoding.generate_qr arena data ecl in
   let result = Svg.qr_to_svg qr in
   Js.string result
 

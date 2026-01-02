@@ -517,7 +517,7 @@ let[@zero_alloc] get_ec_info (config @ local) = exclave_
 let mode_indicator_length = 4
 let mode_indicator = 0b0010
 
-let[@zero_alloc] rec find_version (v @ local) (ecl @ local) (length @ local) =
+let[@zero_alloc] rec find_version v (ecl @ local) length =
   if v > 40 then raise (Invalid_argument "Data too long to encode in QR code")
   else exclave_
     let config = make_local ~version:v ~ecl in

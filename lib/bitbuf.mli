@@ -5,6 +5,11 @@ type t
 val create : int -> t
 (** [create len_bytes] allocates a zeroed buffer of [len_bytes]. *)
 
+val create_from_existing : local_ bytes -> int -> local_ t
+[@@zero_alloc]
+(** [create_from_existing buf] creates a bit buffer using the provided byte
+    array as storage. The contents of [buf] are not modified. *)
+
 val capacity_bits : local_ t -> int [@@zero_alloc]
 val bits_written : local_ t -> int [@@zero_alloc]
 val remaining_bits : local_ t -> int [@@zero_alloc]

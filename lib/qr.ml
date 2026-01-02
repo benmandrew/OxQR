@@ -154,9 +154,9 @@ let is_reserved t x y version =
   || is_in_alignment_pattern t x y version
   || on_format_info
 
-let place_data t data version =
+let place_data t data data_len version =
   let bit_pos = ref 0 in
-  let data_bits = Bytes.length data * 8 in
+  let data_bits = data_len * 8 in
   (* Scan right-to-left in 2-column strips, alternating vertical direction per spec *)
   let x = ref (t.width - 1) in
   let upward = ref true in

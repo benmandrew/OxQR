@@ -47,7 +47,7 @@ let%expect_test "test_version_1_place_data_full" =
   let qr = Qr.make ~version:config.version in
   Qr.place_pattern_modules qr config.version;
   let data = Bytes.init 26 ~f:(fun _ -> Char.of_int_exn 0b11111111) in
-  Qr.place_data qr data config.version;
+  Qr.place_data qr data (Bytes.length data) config.version;
   Stdlib.Printf.printf "\n%s\n" (Qr.to_unicode_string qr);
   [%expect
     {|
@@ -87,7 +87,7 @@ let%expect_test "test_version_1_place_data_partial" =
   let qr = Qr.make ~version:config.version in
   Qr.place_pattern_modules qr config.version;
   let data = Bytes.init 26 ~f:(fun _ -> Char.of_int_exn 0b10001010) in
-  Qr.place_data qr data config.version;
+  Qr.place_data qr data (Bytes.length data) config.version;
   Stdlib.Printf.printf "\n%s\n" (Qr.to_unicode_string qr);
   [%expect
     {|
@@ -176,7 +176,8 @@ let%expect_test "test_version_2_format_info" =
     |}]
 
 let%expect_test "test_hello_world" =
-  let qr = Encoding.generate_qr "HELLO WORLD" Config.ECL.M in
+  let arena = Encoding.Arena.create () in
+  let qr = Encoding.generate_qr arena "HELLO WORLD" Config.ECL.M in
   let qr_string = Qr.to_unicode_string qr in
   Stdlib.Printf.printf "%s\n" qr_string;
   [%expect

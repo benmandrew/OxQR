@@ -7,12 +7,31 @@ let max_ec_per_block = 30
 let _max_data_per_block = 119
 let max_total_ec_bytes = max_blocks * max_ec_per_block (* 2430 *)
 let max_total_bytes = 3706
-let block_data_pos = Array.create ~len:max_blocks 0
-let block_data_len = Array.create ~len:max_blocks 0
-let block_ec_pos = Array.create ~len:max_blocks 0
-let block_ec_len = Array.create ~len:max_blocks 0
-let ec_storage = Bytes.create max_total_ec_bytes
-let interleave_buffer = Bytes.create max_total_bytes
+
+module Arena = struct
+  type t = {
+    block_data_pos : int array;
+    block_data_len : int array;
+    block_ec_pos : int array;
+    block_ec_len : int array;
+    ec_storage : Bytes.t;
+    interleave_buffer : Bytes.t;
+    bitbuf_storage : Bytes.t;
+  }
+
+  let create () =
+    {
+      block_data_pos = Array.create ~len:max_blocks 0;
+      block_data_len = Array.create ~len:max_blocks 0;
+      block_ec_pos = Array.create ~len:max_blocks 0;
+      block_ec_len = Array.create ~len:max_blocks 0;
+      ec_storage = Bytes.create max_total_ec_bytes;
+      interleave_buffer = Bytes.create max_total_bytes;
+      bitbuf_storage = Bytes.create max_total_bytes;
+    }
+
+  let get_qr_buffer (arena @ local) = arena.bitbuf_storage
+end
 
 let[@zero_alloc] rec encode_pairs (buf @ local) s len i =
   let[@zero_alloc] decode c =
@@ -66,7 +85,7 @@ let[@zero_alloc] add_terminator_and_padding (buf @ local) total_data_codewords =
   add_padding bytes_used;
   ()
 
-let[@zero_alloc] split_into_blocks (data @ local) ec_info =
+let[@zero_alloc] split_into_blocks arena ec_info =
   let g1_count = ec_info.Config.group1_blocks in
   let g1_size = ec_info.group1_data_codewords in
   let g2_count = ec_info.group2_blocks in
@@ -77,12 +96,12 @@ let[@zero_alloc] split_into_blocks (data @ local) ec_info =
   for idx = 0 to g1_count - 1 do
     let data_pos = idx * g1_size in
     let ec_pos = idx * ec_per_block in
-    block_data_pos.(idx) <- data_pos;
-    block_data_len.(idx) <- g1_size;
-    block_ec_pos.(idx) <- ec_pos;
-    block_ec_len.(idx) <- ec_per_block;
-    Reed_solomon.generate_error_correction data ~pos:data_pos ~len:g1_size
-      ec_per_block ec_storage ~out_pos:ec_pos
+    arena.Arena.block_data_pos.(idx) <- data_pos;
+    arena.block_data_len.(idx) <- g1_size;
+    arena.block_ec_pos.(idx) <- ec_pos;
+    arena.block_ec_len.(idx) <- ec_per_block;
+    Reed_solomon.generate_error_correction arena.bitbuf_storage ~pos:data_pos
+      ~len:g1_size ec_per_block arena.ec_storage ~out_pos:ec_pos
   done;
   (* Group 2 blocks *)
   let base_data_pos = g1_count * g1_size in
@@ -90,16 +109,16 @@ let[@zero_alloc] split_into_blocks (data @ local) ec_info =
     let idx = g1_count + j in
     let data_pos = base_data_pos + (j * g2_size) in
     let ec_pos = idx * ec_per_block in
-    block_data_pos.(idx) <- data_pos;
-    block_data_len.(idx) <- g2_size;
-    block_ec_pos.(idx) <- ec_pos;
-    block_ec_len.(idx) <- ec_per_block;
-    Reed_solomon.generate_error_correction data ~pos:data_pos ~len:g2_size
-      ec_per_block ec_storage ~out_pos:ec_pos
+    arena.block_data_pos.(idx) <- data_pos;
+    arena.block_data_len.(idx) <- g2_size;
+    arena.block_ec_pos.(idx) <- ec_pos;
+    arena.block_ec_len.(idx) <- ec_per_block;
+    Reed_solomon.generate_error_correction arena.bitbuf_storage ~pos:data_pos
+      ~len:g2_size ec_per_block arena.ec_storage ~out_pos:ec_pos
   done;
   total_blocks
 
-let[@zero_alloc] interleave_blocks block_count ec_info data =
+let[@zero_alloc] interleave_blocks arena block_count ec_info =
   let max_data_size =
     max ec_info.Config.group1_data_codewords ec_info.group2_data_codewords
   in
@@ -109,14 +128,15 @@ let[@zero_alloc] interleave_blocks block_count ec_info data =
     + (ec_info.group2_blocks * ec_info.group2_data_codewords)
     + (block_count * ec_size)
   in
-  let out = interleave_buffer in
+  let out = arena.Arena.interleave_buffer in
   let rec interleave_data i out_pos =
     if i = max_data_size then out_pos
     else
       let rec loop_blocks idx out_pos =
         if idx = block_count then out_pos
-        else if i < block_data_len.(idx) then (
-          Bytes.set out out_pos (Bytes.get data (block_data_pos.(idx) + i));
+        else if i < arena.block_data_len.(idx) then (
+          Bytes.set out out_pos
+            (Bytes.get arena.bitbuf_storage (arena.block_data_pos.(idx) + i));
           loop_blocks (idx + 1) (out_pos + 1))
         else loop_blocks (idx + 1) out_pos
       in
@@ -129,8 +149,8 @@ let[@zero_alloc] interleave_blocks block_count ec_info data =
       let rec loop_blocks idx out_pos =
         if idx = block_count then out_pos
         else
-          let ec_pos = block_ec_pos.(idx) + i in
-          Bytes.set out out_pos (Bytes.get ec_storage ec_pos);
+          let ec_pos = arena.block_ec_pos.(idx) + i in
+          Bytes.set out out_pos (Bytes.get arena.ec_storage ec_pos);
           loop_blocks (idx + 1) (out_pos + 1)
       in
       let next_pos = loop_blocks 0 out_pos in
@@ -140,32 +160,33 @@ let[@zero_alloc] interleave_blocks block_count ec_info data =
   let _ = interleave_ec 0 after_data in
   out
 
-let encode s (ecl @ local) =
+let encode arena s (ecl @ local) =
   let config = Config.get_config s ecl in
   let ec_info = Config.get_ec_info config in
   let total_data_codewords =
     (ec_info.group1_blocks * ec_info.group1_data_codewords)
     + (ec_info.group2_blocks * ec_info.group2_data_codewords)
   in
-  let buf = Bitbuf.create total_data_codewords in
+  let buf =
+    Bitbuf.create_from_existing arena.Arena.bitbuf_storage total_data_codewords
+  in
   Bitbuf.write_bits_msb buf Config.mode_indicator Config.mode_indicator_length;
   let cci_len = Config.char_count_indicator_length config in
   Bitbuf.write_bits_msb buf (String.length s) cci_len;
   encode_alphanumeric_data buf s;
   add_terminator_and_padding buf total_data_codewords;
-  buf
+  total_data_codewords
 
-let generate_qr s ecl =
+let generate_qr arena s ecl =
   let config = Config.get_config s ecl in
   let ec_info = Config.get_ec_info config in
-  let buf = encode s ecl in
-  let data = Bitbuf.to_bytes_local buf in
-  let block_count = split_into_blocks data ec_info in
-  let final_data = interleave_blocks block_count ec_info data in
+  let total_data_codewords = encode arena s ecl in
+  let block_count = split_into_blocks arena ec_info in
+  let final_data = interleave_blocks arena block_count ec_info in
   let qr = Qr.make ~version:config.version in
   Qr.place_pattern_modules qr config.version;
   let mask_pattern = 0 in
   Qr.place_format_info qr ~ecl:config.ecl ~mask_pattern;
-  Qr.place_data qr final_data config.version;
+  Qr.place_data qr final_data total_data_codewords config.version;
   Qr.apply_mask_pattern qr;
   qr
