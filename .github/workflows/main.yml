@@ -24,8 +24,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y opam
       - name: "setup oxcaml"
+        env:
+          OPAMYES: "1"
         run: |
-          opam init --no-setup
+          opam init --no-setup --disable-sandboxing
           opam update --all
           opam switch list | grep -q "5.2.0+ox" || opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git#535c466c935bb7076ff517e425cd08f8b2f6a356,default
       - name: "install dependencies"
