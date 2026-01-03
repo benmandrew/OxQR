@@ -2,13 +2,21 @@ open Base
 
 type t = {
   buf : bytes;
+  buf_len : int;
   mutable bit_pos : int; (* number of bits written so far *)
 }
 
-let create len_bytes = exclave_
-  { buf = (Bytes.make [@alloc stack]) len_bytes '\000'; bit_pos = 0 }
+let create len_bytes =
+  {
+    buf = (Bytes.make [@alloc stack]) len_bytes '\000';
+    buf_len = len_bytes;
+    bit_pos = 0;
+  }
 
-let capacity_bits (t @ local) = Bytes.length t.buf * 8
+let[@zero_alloc] create_from_existing buf len_bytes = exclave_
+  { buf; buf_len = len_bytes; bit_pos = 0 }
+
+let capacity_bits (t @ local) = t.buf_len * 8
 let bits_written (t @ local) = t.bit_pos
 let remaining_bits (t @ local) = capacity_bits t - t.bit_pos
 let pos (t @ local) = t.bit_pos
@@ -16,7 +24,7 @@ let pos_byte (t @ local) = t.bit_pos lsr 3
 let pos_bit_in_byte (t @ local) = t.bit_pos land 7
 
 let reset (t @ local) =
-  Bytes.fill t.buf ~pos:0 ~len:(Bytes.length t.buf) '\000';
+  Bytes.fill t.buf ~pos:0 ~len:t.buf_len '\000';
   t.bit_pos <- 0
 
 let check_space (t @ local) needed_bits =

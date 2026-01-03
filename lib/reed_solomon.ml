@@ -50,14 +50,10 @@ let generator_polynomials =
 (** Generate the generator polynomial for n error correction codewords *)
 let[@zero_alloc] generate_generator_polynomial n = generator_polynomials.(n)
 
-(* Scratch space sized for the worst QR block (version 40, max data 119, max
-   ec 30) with headroom. *)
-let remainder_scratch = Array.create ~len:512 0
-
 (** Generate error correction codewords for given data slice and number of ec
     codewords, writing into [out] at [out_pos]. *)
-let[@zero_alloc] generate_error_correction (data @ local) ~pos ~len ec_count
-    (out @ local) ~out_pos =
+let[@zero_alloc] generate_error_correction (remainder_scratch @ local)
+    (data @ local) ~pos ~len ec_count (out @ local) ~out_pos =
   let generator = generate_generator_polynomial ec_count in
   (* Copy data slice into the beginning of remainder and clear the EC tail. *)
   for i = 0 to len - 1 do

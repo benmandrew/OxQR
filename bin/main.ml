@@ -4,7 +4,8 @@ open Base
 type output_format = Svg | Ascii
 
 let run data ecl format =
-  let qr = Encoding.generate_qr data ecl in
+  let arena = Encoding.Arena.create None in
+  let qr = Encoding.generate_qr arena data ecl in
   let output_string =
     match format with
     | Svg -> Svg.qr_to_svg qr

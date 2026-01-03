@@ -176,9 +176,10 @@ let%expect_test "test_version_2_format_info" =
     |}]
 
 let%expect_test "test_hello_world" =
-  let qr = Encoding.generate_qr "HELLO WORLD" Config.ECL.M in
+  let arena = Encoding.Arena.create None in
+  let qr = Encoding.generate_qr arena "HELLO WORLD" Config.ECL.M in
   let qr_string = Qr.to_unicode_string qr in
-  Stdlib.Printf.printf "%s\n" qr_string;
+  Out_channel.output_string Out_channel.stdout (qr_string ^ "\n");
   [%expect
     {|
     ██████████████████████████████████████████████████████████
