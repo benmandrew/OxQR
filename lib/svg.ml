@@ -1,8 +1,8 @@
 open Base
 
-let qr_to_svg (t : Qr.t) =
+let qr_to_svg (t @ local) =
   let buf = Buffer.create 13000 in
-  let width = t.width + 8 in
+  let width = t.Qr.width + 8 in
   Buffer.add_string buf
     (Printf.sprintf
        "<svg version=\"1.1\" viewBox=\"0 0 %d %d\" \
