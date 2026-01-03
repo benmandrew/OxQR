@@ -27,12 +27,12 @@ opam install . --deps-only --with-test
 dune build
 ```
 
-You can then either run the CLI tool, or start a local web server to interact through a browser.
+You can then either run the CLI tool, or start a local web server to interact through a browser at [http://localhost:8000/web](http://localhost:8000/web).
 
 ```bash
 dune exec oxqr -- --ecl M --format ascii "HELLO WORLD"
 # Or...
-python -m http.server -d web 8000
+python -m http.server 8000
 ```
 
 
