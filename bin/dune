@@ -22,6 +22,13 @@
  (flags
   (:standard -w -32)))
 
+(executable
+ (name tail_events)
+ (public_name tail_events)
+ (libraries oxqr runtime_events unix)
+ (flags
+  (:standard -w -32)))
+
 (env
  (release
   (flags
